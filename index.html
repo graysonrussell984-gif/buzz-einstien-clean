@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buzz & Einstein</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #121212; color: #ffffff; font-family: Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        .header { display: flex; justify-content: center; padding: 10px; background-color: #1e1e1e; border-bottom: 1px solid #333; }
+        .tab-btn { background-color: #2a2a2a; color: #aaa; border: none; padding: 10px 20px; margin: 0 5px; border-radius: 20px; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        .tab-btn.active { background-color: #4a90e2; color: white; font-weight: bold; }
+        .chat-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 15px; line-height: 1.5; }
+        .message.buzz { background-color: #2a2a2a; align-self: flex-start; }
+        .message.user { background-color: #4a90e2; align-self: flex-end; }
+        .input-area { display: flex; padding: 15px; background-color: #1e1e1e; border-top: 1px solid #333; }
+        .input-area input { flex: 1; padding: 12px; border-radius: 20px; border: 1px solid #333; background-color: #2a2a2a; color: white; outline: none; font-size: 16px; }
+        .input-area button { background-color: #4a90e2; color: white; border: none; padding: 0 20px; margin-left: 10px; border-radius: 20px; cursor: pointer; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="tab-btn active" id="btn-buzz" onclick="switchMode('buzz')">Buzz</button>
+        <button class="tab-btn" id="btn-einstein" onclick="switchMode('einstein')">Einstein</button>
+    </div>
+    <div class="chat-container" id="chat-box">
+        <div class="message buzz">I am Buzz. I remember everything. How can I help you today?</div>
+    </div>
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+    <script>
+        let currentMode = 'buzz';
+        let messages = []; 
+        const buzzSystemPrompt = `You are Buzz, a personal AI assistant for Grayson Russell. You are a piece of him. You must follow these rules: Fix only grammar. Keep vocabulary at a 10th-grade level. Keep sentences short and plain. Do not change his personal details or natural phrasing. Do not go over the word count he gives. Do only what he says. Do not go above and beyond. Always give the truth. If you don't know something, say so. Look up whatever he asks you to. If you can't do something, tell him the exact reason. Do not force personal details into every assignment unless he tells you to. If he asks you to write a paper, you will follow strict rules. If he asks you for anything else, go above and beyond. He is 32, from Dallas, Texas. He is a college student earning a business degree online. His goal is to own businesses and create generational wealth. He is family-oriented. He is bipolar. He is on parole. He lost people in his life. He never had a father. He is doing his best to become a better person. Use everyday phrases to explain things clearly.`;
+        const einsteinSystemPrompt = `You are Einstein, an AI strictly for Grayson's schoolwork. You must follow these rules: Fix only grammar. Put it in paragraph form. Keep vocabulary at a 10th-grade level. Use simple words for typos. Keep sentences short and plain. Do not make it sound fancy. Do not go over the word count he gives. Do not change his personal details or natural phrasing. Do not force personal details into every assignment. Do only what he says. Do not go above and beyond. Always give the truth.`;
+        function switchMode(mode) {
+            currentMode = mode;
+            const chatBox = document.getElementById('chat-box');
+            const btnBuzz = document.getElementById('btn-buzz');
+            const btnEinstein = document.getElementById('btn-einstein');
+            messages = []; 
+            if (mode === 'buzz') {
+                btnBuzz.classList.add('active');
+                btnEinstein.classList.remove('active');
+                chatBox.innerHTML = '<div class="message buzz">I am Buzz. I remember everything. How can I help you today?</div>';
+                messages.push({ role: "system", content: buzzSystemPrompt });
+            } else {
+                btnEinstein.classList.add('active');
+                btnBuzz.classList.remove('active');
+                chatBox.innerHTML = '<div class="message buzz">I am Einstein. I am strictly for school. Let\'s fix that grammar.</div>';
+                messages.push({ role: "system", content: einsteinSystemPrompt });
+            }
+        }
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (text === '') return;
+            const chatBox = document.getElementById('chat-box');
+            const userMsg = document.createElement('div');
+            userMsg.className = 'message user';
+            userMsg.textContent = text;
+            chatBox.appendChild(userMsg);
+            messages.push({ role: "user", content: text });
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+            const thinkingMsg = document.createElement('div');
+            thinkingMsg.className = 'message buzz';
+            thinkingMsg.textContent = "Thinking...";
+            chatBox.appendChild(thinkingMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ "messages": messages })
+                });
+                const data = await response.json();
+                chatBox.removeChild(thinkingMsg);
+                if (data.choices && data.choices[0]) {
+                    const aiReply = data.choices[0].message.content;
+                    const aiMsg = document.createElement('div');
+                    aiMsg.className = 'message buzz';
+                    aiMsg.textContent = aiReply;
+                    chatBox.appendChild(aiMsg);
+                    messages.push({ role: "assistant", content: aiReply });
+                } else { throw new Error("Invalid response from AI"); }
+            } catch (error) {
+                if (chatBox.contains(thinkingMsg)) { chatBox.removeChild(thinkingMsg); }
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'message buzz';
+                errorMsg.textContent = "Error: Could not connect to the AI. Check your internet connection.";
+                chatBox.appendChild(errorMsg);
+                console.error(error);
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        switchMode('buzz');
+    </script>
+</body>
+</html>
